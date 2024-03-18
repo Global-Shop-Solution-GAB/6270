@@ -1,0 +1,405 @@
+Program.Sub.ScreenSU.Start
+Gui.F_Setup..Create
+Gui.F_Setup..Caption("Quote Approver Setup")
+Gui.F_Setup..Size(15315,9045)
+Gui.F_Setup..MinX(0)
+Gui.F_Setup..MinY(0)
+Gui.F_Setup..Position(0,0)
+Gui.F_Setup..FontSize(9)
+Gui.F_Setup..BackColor(-2147483633)
+Gui.F_Setup..MousePointer(0)
+Gui.F_Setup..Event(UnLoad,Unload)
+Gui.F_Setup.tab1.Create(Tab)
+Gui.F_Setup.tab1.Size(14940,8295)
+Gui.F_Setup.tab1.Position(75,90)
+Gui.F_Setup.tab1.FontSize(9)
+Gui.F_Setup.tab1.Tabs(3)
+Gui.F_Setup.tab1.SetTab(0)
+Gui.F_Setup.tab1.Caption("Region Setting")
+Gui.F_Setup.tab1.SetTab(1)
+Gui.F_Setup.tab1.Caption("Customer Region")
+Gui.F_Setup.tab1.SetTab(2)
+Gui.F_Setup.tab1.Caption("User Restriction")
+Gui.F_Setup.GsGCRegion.Create(GsGridControl)
+Gui.F_Setup.GsGCRegion.Size(14700,7770)
+Gui.F_Setup.GsGCRegion.Position(75,60)
+Gui.F_Setup.GsGCRegion.Parent("tab1",0)
+Gui.F_Setup.GsGCRegion.Event(CellValueChanged,GsGCRegion_CellValueChanged)
+Gui.F_Setup.GsGCRegion.Event(RowCellClick,GsGCRegion_RowCellClick)
+Gui.F_Setup.GsGCCustomer.Create(GsGridControl)
+Gui.F_Setup.GsGCCustomer.Size(14700,7770)
+Gui.F_Setup.GsGCCustomer.Position(75,60)
+Gui.F_Setup.GsGCCustomer.Parent("tab1",1)
+Gui.F_Setup.GsGCCustomer.Event(CellValueChanged,GsGCCustomer_CellValueChanged)
+Gui.F_Setup.GsGCUser.Create(GsGridControl)
+Gui.F_Setup.GsGCUser.Size(5295,7770)
+Gui.F_Setup.GsGCUser.Position(75,60)
+Gui.F_Setup.GsGCUser.Parent("tab1",2)
+Gui.F_Setup.GsGCUser.Event(RowClick,GsGCUser_RowClick)
+Gui.F_Setup.GsGCCustUser.Create(GsGridControl)
+Gui.F_Setup.GsGCCustUser.Size(9300,7770)
+Gui.F_Setup.GsGCCustUser.Position(5475,60)
+Gui.F_Setup.GsGCCustUser.Parent("tab1",2)
+Gui.F_Setup.GsGCCustUser.Event(CellValueChanged,GsGCCustUser_CellValueChanged)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+V.Global.sUser.Declare
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+V.Local.sIcon.Declare
+V.Local.bExist.Declare
+
+F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+F.ODBC.Connection!ccon.OpenConnection(V.Ambient.Ccon,V.Ambient.Cuser,V.Ambient.Cpass)
+
+F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,V.Local.sIcon)
+Gui.F_Setup..Icon(V.Local.sIcon)
+'Gui.F_Multiple..Icon(V.Local.sIcon)
+'Gui.F_Multiple..Sizeable(False)
+
+F.ODBC.Connection!conx.TableExists("GAB_6270_CUST_REGION",V.Local.bExist)
+F.Intrinsic.Control.If(V.Local.bExist,=,False)
+	F.ODBC.Connection!Conx.Execute("CREATE TABLE GAB_6270_CUST_REGION(CUSTOMER CHAR(6), REGION_ID INTEGER, PRIMARY KEY(CUSTOMER));")
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conx.TableExists("GAB_6270_REGION",V.Local.bExist)
+F.Intrinsic.Control.If(V.Local.bExist,=,False)
+	F.ODBC.Connection!Conx.Execute("CREATE TABLE GAB_6270_REGION(ID IDENTITY, REGION VARCHAR(50), PRIMARY KEY(ID));")
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conx.TableExists("GAB_6270_USER_REGION",V.Local.bExist)
+F.Intrinsic.Control.If(V.Local.bExist,=,False)
+	F.ODBC.Connection!Conx.Execute("CREATE TABLE GAB_6270_USER_REGION(GSS_USER CHAR(8), SEQ INTEGER, REGION_ID INTEGER, PRIMARY KEY(GSS_USER,SEQ));")
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conx.TableExists("GAB_6270_APRVL",V.Local.bExist)
+F.Intrinsic.Control.If(V.Local.bExist,=,False)
+	F.ODBC.Connection!Conx.Execute("CREATE TABLE GAB_6270_APRVL (QUOTE_NO VARCHAR(7) NOT NULL, DATE_QUOTE DATE NOT NULL, CUSTOMER VARCHAR(6) NOT NULL, CUST_AMOUNT NUMERIC(15,2), AMOUNT NUMERIC(15,2), DATE_DUE DATE NOT NULL, ORIGINATOR VARCHAR(8) NOT NULL, APPROVER VARCHAR(8), APPROVED_DATE DATETIME);")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.CallSub(LoadGrid)
+
+Gui.F_Setup.tab1.Anchor(15)
+gui.F_Setup.GsGCCustomer.Anchor(15)
+Gui.F_Setup.GsGCRegion.Anchor(15)
+Gui.F_Setup.GsGCCustUser.Anchor(15)
+Gui.F_Setup.tab1.SetTab(0)
+Gui.F_Setup.GsGCCustUser.Enabled(False)
+
+Gui.F_Setup..Show
+Program.Sub.Main.End
+
+Program.Sub.Unload.Start
+F.Data.Dictionary.Close("dicRegion")
+F.Data.DataTable.Close("dtRegion")
+F.Data.DataTable.Close("dtCustomer")
+F.Data.DataTable.Close("dtUser")
+F.Data.DataTable.Close("dtRegUser")
+
+F.ODBC.Connection!conx.Close
+F.ODBC.Connection!ccon.Close
+F.Intrinsic.Control.End
+
+Program.Sub.Unload.End
+
+Program.Sub.cmdBrwUser_Click.Start
+V.Local.iWidths.Declare
+V.Local.sMessage.Declare
+V.Local.sRet.Declare
+V.Local.sSQL.Declare
+V.Local.sTitles.Declare
+
+F.Intrinsic.String.Split("UserID*!*First Name*!*Last Name","*!*",V.Local.sTitles)
+F.Intrinsic.String.Split("1000*!*1500*!*1500","*!*",V.Local.iWidths)
+
+V.Local.sSQL.Set("select gs_user, first_name, last_name from user_information where enabled = 1 order by gs_user")
+
+F.Intrinsic.UI.SetBrowserHotTypeAhead(True)
+F.Intrinsic.UI.Browser("Select UserID","ccon",V.Local.sSQL,V.Local.sTitles,V.Local.iWidths,V.Local.sRet)
+F.Intrinsic.Control.If(V.Local.sRet,<>,"***CANCEL***")
+	F.Intrinsic.String.Split(V.Local.sRet,"*!*",V.Local.sRet)
+	
+	'Gui.F_Setup.txtUserID.Text(V.Local.sRet(0).trim)
+	F.Intrinsic.String.Concat(V.Local.sRet(1).trim," ",V.Local.sRet(2).trim,V.Local.sMessage)
+	'Gui.F_Setup.txtName.Text(V.Local.sMessage)
+	
+F.Intrinsic.Control.EndIf
+Program.Sub.cmdBrwUser_Click.End
+
+Program.Sub.LoadGrid.Start
+V.Local.i1.Declare
+V.Local.iID.Declare
+V.Local.sSQL.Declare
+V.Local.sValue.Declare
+'Sales Region
+F.Data.DataTable.CreateFromSQL("dtRegion","conx","select id as ID, region as Region, region as Previous from GAB_6270_REGION order by region",True)
+'No region has been setup previously
+F.Intrinsic.Control.If(V.DataTable.dtRegion.RowCount,=,0)
+	F.Data.DataTable.AddRow("dtRegion","ID",1,"Region","","Previous","")
+'There is a region setup previously
+F.Intrinsic.Control.Else
+	F.Data.DataTable.Compute("dtRegion","MAX(ID)","",V.Local.iID)
+	F.Intrinsic.Math.Add(V.Local.iID,1,V.Local.iID)
+	F.Data.DataTable.AddRow("dtRegion","ID",V.Local.iID,"Region","","Previous","")
+F.Intrinsic.Control.EndIf
+
+F.Data.DataTable.AddColumn("dtRegion","Delete","Long",0)
+
+Gui.F_Setup.GsGCRegion.AddGridviewFromDatatable("gvRegion","dtRegion")
+Gui.F_Setup.GsGCRegion.MainView("gvRegion")
+Gui.F_Setup.GsGCRegion.SetColumnProperty("gvRegion","ID","Visible",False)
+Gui.F_Setup.GsGCRegion.SetColumnProperty("gvRegion","Previous","Visible",False)
+Gui.F_Setup.GsGCRegion.SetColumnProperty("gvRegion","Region","HeaderHAlignment","Center")
+Gui.F_Setup.GsGCRegion.SetColumnProperty("gvRegion","Region","AllowEdit",True)
+Gui.F_Setup.GsGCRegion.SetColumnProperty("gvRegion","Delete","AllowEdit",False)
+Gui.F_Setup.GsGCRegion.SetColumnProperty("gvRegion","Region","ReadOnly",False)
+Gui.F_Setup.GsGCRegion.SetColumnProperty("gvRegion","Delete","ShowCaption",False)
+Gui.F_Setup.GsGCRegion.SetColumnProperty("gvRegion","Region","MinWidth","100")
+Gui.F_Setup.GsGCRegion.SetColumnProperty("gvRegion","Delete","MinWidth","60")
+Gui.F_Setup.GsGCRegion.ColumnEdit("gvRegion","Delete","EditorButton","Delete")
+
+'Customer Region 
+'F.Data.DataTable.CreateFromSQL("dtCustomer","conx","select c1.customer as Customer, c2.customerlong as CustomerName, '' as Region, 0 as RegionID from v_customer_master c1 left join gab_customer_long c2 on c1.customer = c2.customer order by c1.customer",True)
+'F.ODBC.Connection!conx.TableExists("GAB_6270_APRVL",V.Local.bExist)
+'F.Intrinsic.Control.If(V.Local.bExist,=,False)
+'	F.ODBC.Connection!Conx.Execute("CREATE TABLE GAB_6270_APRVL (QUOTE_NO VARCHAR(7) NOT NULL, DATE_QUOTE DATE NOT NULL, CUSTOMER VARCHAR(6) NOT NULL, AMOUNT NUMERIC(15,2), DATE_DUE DATE NOT NULL, ORIGINATOR VARCHAR(8) NOT NULL, APPROVER VARCHAR(8), APPROVED_DATE DATETIME);")
+'F.Intrinsic.Control.EndIf
+'F.Data.DataTable.CreateFromSQL("dtCustomer","conx","select c1.customer as Customer, if(c2.customerlong <> '',c2.customerlong,c1.Name_Customer) as CustomerName, '' as Region, 0 as RegionID from v_customer_master c1 left join gab_customer_long c2 on c1.customer = c2.customer Union All Select C3.Prospect as Customer, if(c4.prospectlong <> '',c4.prospectlong,c3.Name_Prospect) as CustomerName, '' as Region, 0 as RegionID From V_Prospect_Master C3 left join gab_prospect_long c4 on c3.prospect = c4.prospect order by c1.customer",True)
+'Fill region ID from GAB_6270_CUST_REGION
+F.Data.DataTable.CreateFromSQL("dtCustomer","conx","select c1.customer as Customer, c1.Name_Customer as CustomerName, '' as Region, 0 as RegionID from v_customer_master c1 Union All Select C3.Prospect as Customer, c3.Name_Prospect as CustomerName, '' as Region, 0 as RegionID From V_Prospect_Master C3 order by c1.customer",True)
+'Fill region ID from GAB_6270_CUST_REGION
+F.Data.Dictionary.CreateFromSQL("dicCRegion","conx","select customer, region_id from GAB_6270_CUST_REGION")
+F.Data.Dictionary.SetDefaultReturn("dicCRegion",0)
+F.Data.DataTable.FillFromDictionary("dtCustomer","dicCRegion","Customer","RegionID")
+F.Data.Dictionary.Close("dicCRegion")
+'Fill region name 
+F.Data.Dictionary.CreateFromSQL("dicRegion","conx","select id, region from GAB_6270_REGION")
+F.Data.Dictionary.SetDefaultReturn("dicRegion","")
+F.Data.DataTable.FillFromDictionary("dtCustomer","dicRegion","RegionID","Region")
+
+gui.F_Setup.GsGCCustomer.AddGridviewFromDatatable("gvCust","dtCustomer")
+gui.F_Setup.GsGCCustomer.MainView("gvCust")
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","RegionID","Visible",False)
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","Customer","HeaderHAlignment","Center")
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","CustomerName","HeaderHAlignment","Center")
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","Region","HeaderHAlignment","Center")
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","CustomerName","Caption","Customer Name")
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","Customer","MinWidth","100")
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","CustomerName","MinWidth","210")
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","Region","MinWidth","170")
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","Region","AllowEdit",True)
+gui.F_Setup.GsGCCustomer.SetColumnProperty("gvCust","Region","ReadOnly",False)
+F.Data.DataView.Create("dtRegion","dvRegion",22,"","Region ASC")
+F.Intrinsic.Control.For(V.Local.i1,0,V.DataView.dtRegion!dvRegion.RowCount--,1)
+	F.Intrinsic.Control.If(V.DataView.dtRegion!dvRegion(V.Local.i1).Region!FieldValTrim,<>,"")
+		F.Intrinsic.Control.If(V.Local.sValue.Trim,=,"")
+			F.Intrinsic.String.Concat("","*!*",V.DataView.dtRegion!dvRegion(V.Local.i1).Region!FieldValTrim,V.Local.sValue)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Concat(V.Local.sValue,"*!*",V.DataView.dtRegion!dvRegion(V.Local.i1).Region!FieldValTrim,V.Local.sValue)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.i1)
+F.Data.DataView.Close("dtRegion","dvRegion")
+gui.F_Setup.GsGCCustomer.ColumnEdit("gvCust","Region","Dropdownlist",V.Local.sValue)
+F.Intrinsic.Control.CallSub(LoadUserGrid)
+Program.Sub.LoadGrid.End
+
+Program.Sub.LoadUserGrid.Start
+V.Local.sSQL.Declare
+
+F.Intrinsic.Control.If(V.DataTable.dtUser.Exists,=,True)
+	F.Data.DataTable.Close("dtUser")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.DataTable.dtRegUser.Exists,=,True)
+	F.Data.DataTable.Close("dtRegUser")
+F.Intrinsic.Control.EndIf
+
+'User Customer
+F.Intrinsic.String.Build("select gs_user as UserID, rtrim(first_name)+' '+rtrim(last_name) as UserName from user_information where company = '{0}' or company = '' order by gs_user",V.Caller.CompanyCode,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("dtUser","ccon",V.Local.sSQL,True)
+'Customer Region 
+'F.Data.DataTable.CreateFromSQL("dtRegUser","conx","select rtrim(c1.customer) as Customer, c2.customerlong as CustomerName from v_customer_master c1 left join gab_customer_long c2 on c1.customer = c2.customer order by c1.customer",True)
+'F.Data.DataTable.CreateFromSQL("dtRegUser","conx","select rtrim(c1.customer) as Customer, if(c2.customerlong <> '',c2.customerlong,c1.Name_Customer) as CustomerName from v_customer_master c1 left join gab_customer_long c2 on c1.customer = c2.customer Union All Select rtrim(C3.Prospect) as Customer, if(c4.prospectlong <> '',c4.prospectlong,c3.Name_Prospect) as CustomerName From V_Prospect_Master C3 left join gab_prospect_long c4 on c3.prospect = c4.prospect order by c1.customer",True)
+F.Data.DataTable.CreateFromSQL("dtRegUser","conx","select ID, Region FROM GAB_6270_REGION",True)
+F.Data.DataTable.AddColumn("dtRegUser","Selected","Boolean",False)
+
+Gui.F_Setup.GsGCUser.AddGridviewFromDatatable("gvUser","dtUser")
+Gui.F_Setup.GsGCUser.MainView("gvUser")
+Gui.F_Setup.GsGCUser.SetColumnProperty("gvUser","UserID","HeaderHAlignment","Center")
+Gui.F_Setup.GsGCUser.SetColumnProperty("gvUser","UserName","HeaderHAlignment","Center")
+Gui.F_Setup.GsGCUser.SetColumnProperty("gvUser","UserName","Caption","Name")
+Gui.F_Setup.GsGCUser.SetColumnProperty("gvUser","UserID","MinWidth","100")
+Gui.F_Setup.GsGCUser.SetColumnProperty("gvUser","UserName","MinWidth","180")
+Gui.F_Setup.GsGCUser.SetColumnProperty("gvUser","UserID","AllowEdit",False)
+Gui.F_Setup.GsGCUser.SetColumnProperty("gvUser","UserName","AllowEdit",False)
+
+Gui.F_Setup.GsGCCustUser.AddGridviewFromDatatable("gvCUser","dtRegUser")
+Gui.F_Setup.GsGCCustUser.MainView("gvCUser")
+Gui.F_Setup.GsGCCustUser.SetColumnProperty("gvCUser","ID","Visible",False)
+Gui.F_Setup.GsGCCustUser.SetColumnProperty("gvCUser","Selected","ShowCaption",False)
+Gui.F_Setup.GsGCCustUser.SetColumnProperty("gvCUser","Region","HeaderHAlignment","Center")
+Gui.F_Setup.GsGCCustUser.SetColumnProperty("gvCUser","Region","MinWidth","200")
+Gui.F_Setup.GsGCCustUser.SetColumnProperty("gvCUser","Selected","ReadOnly",False)
+Gui.F_Setup.GsGCCustUser.SetColumnProperty("gvCUser","Selected","AllowEdit",True)
+Program.Sub.LoadUserGrid.End
+
+Program.Sub.GsGCRegion_CellValueChanged.Start
+V.Local.iID.Declare
+V.Local.sAfter.Declare
+V.Local.sBefore.Declare
+V.Local.sSQL.Declare
+V.Local.sValue.Declare
+
+F.Intrinsic.Control.If(V.Args.Column,=,"Region")
+	V.Local.sValue.Set(V.Args.Value)
+	F.Intrinsic.Control.If(V.Local.sValue.Trim,<>,"")
+		F.Intrinsic.String.LCase(V.Local.sValue.Trim,V.Local.sAfter)
+		F.Intrinsic.String.LCase(V.DataTable.dtRegion(V.Args.RowIndex).Previous!FieldValTrim,V.Local.sBefore)
+		'Check if before is different from after
+		F.Intrinsic.Control.If(V.Local.sAfter,<>,V.Local.sBefore)
+			F.Data.DataTable.AcceptChanges("dtRegion")
+			'New entry
+			F.Intrinsic.Control.If(V.Local.sBefore.Trim,=,"")
+				F.Intrinsic.String.Build("insert into GAB_6270_REGION(id,region) values({0},'{1}');",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong,V.Local.sValue.Trim,V.Local.sSQL)
+				F.Data.DataTable.Compute("dtRegion","MAX(ID)","",V.Local.iID)
+				F.Intrinsic.Math.Add(V.Local.iID,1,V.Local.iID)
+				F.Data.DataTable.AddRow("dtRegion","ID",V.Local.iID,"Region","","Previous","")
+				F.Data.Dictionary.AddItem("dicRegion",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong,V.Local.sValue.Trim)
+			'Updated entry
+			F.Intrinsic.Control.Else
+				F.Intrinsic.String.Build("update GAB_6270_REGION set region = '{1}' where id = {0}",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong,V.Local.sValue.Trim,V.Local.sSQL)
+				F.Data.Dictionary.RemoveItem("dicRegion",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong)
+				F.Data.Dictionary.AddItem("dicRegion",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong,V.Local.sValue.Trim)
+			F.Intrinsic.Control.EndIf
+			F.Data.DataTable.SetValue("dtRegion",V.Args.RowIndex,"Previous",V.Local.sValue.Trim)
+			F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+		F.Intrinsic.Control.EndIf
+		
+		F.Intrinsic.Control.CallSub(UpdateGridDropdownlist)
+		F.Intrinsic.Control.CallSub(LoadUserGrid)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+Program.Sub.GsGCRegion_CellValueChanged.End
+
+Program.Sub.GsGCRegion_RowCellClick.Start
+V.Local.i1.Declare
+V.Local.iRet.Declare
+V.Local.sFilter.Declare
+V.Local.sSQL.Declare
+
+F.Intrinsic.Control.If(V.Args.Column,=,"Delete")
+	F.Intrinsic.Control.If(V.DataTable.dtRegion(V.Args.RowIndex).Previous!FieldValTrim,<>,"")
+		F.Intrinsic.UI.Msgbox("Are you sure you want to delete this region?","",4,V.Local.iRet)
+		F.Intrinsic.Control.If(V.Local.iRet,=,6)
+			F.Data.Dictionary.RemoveItem("dicRegion",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong)
+			F.Intrinsic.String.Build("delete from GAB_6270_REGION where id = {0}",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong,V.Local.sSQL)
+			F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+			'Delete Customer Region relationship
+			F.Intrinsic.String.Build("delete from GAB_6270_CUST_REGION where region_id = {0}",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong,V.Local.sSQL)
+			F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+			'Remove region and set region ID to 0 in dtCustomer
+			F.Intrinsic.String.Build("RegionID = {0}",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong,V.Local.sFilter)
+			F.Data.DataView.Create("dtCustomer","dvCust",22,V.Local.sFilter,"")
+			F.Intrinsic.Control.For(V.Local.i1,0,V.DataView.dtCustomer!dvCust.RowCount--,1)
+				F.Data.DataView.SetValue("dtCustomer","dvCust",V.Local.i1,"RegionID",0,"Region","")
+			F.Intrinsic.Control.Next(V.Local.i1)
+			F.Data.DataView.Close("dtCustomer","dvCust")
+			'Delete Customer Region relationship
+			F.Intrinsic.String.Build("delete from GAB_6270_USER_REGION where region_id = {0}",V.DataTable.dtRegion(V.Args.RowIndex).ID!FieldValLong,V.Local.sSQL)
+			F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+			'Remove region and set region ID to 0 in dtRegUser
+			F.Intrinsic.Control.CallSub(LoadUserGrid)
+			F.Data.DataTable.DeleteRow("dtRegion",V.Args.RowIndex)
+			F.Data.DataTable.AcceptChanges("dtRegion")
+			
+			F.Intrinsic.Control.CallSub(UpdateGridDropdownlist)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+Program.Sub.GsGCRegion_RowCellClick.End
+
+Program.Sub.GsGCCustomer_CellValueChanged.Start
+V.Local.iID.Declare
+V.Local.sSQL.Declare
+V.Local.sValue.Declare
+
+F.Intrinsic.Control.If(V.Args.Column,=,"Region")
+	V.Local.sValue.Set(V.Args.Value)
+	F.Intrinsic.Control.If(V.Local.sValue.Trim,<>,"")
+		F.Data.Dictionary.ReturnKeyFromValue("dicRegion",V.Args.Value,V.Local.iID)
+		F.Data.DataTable.SetValue("dtCustomer",V.Args.RowIndex,"RegionID",V.Local.iID)
+		F.Intrinsic.String.Build("select region_id from GAB_6270_CUST_REGION where customer = '{0}'",V.DataTable.dtCustomer(V.Args.RowIndex).Customer!FieldValTrim,V.Local.sSQL)
+		F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.sSQL)
+		F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,True)
+			F.Intrinsic.String.Build("insert into GAB_6270_CUST_REGION(customer,region_id) values('{0}',{1});",V.DataTable.dtCustomer(V.Args.RowIndex).Customer!FieldValTrim,V.Local.iID,V.Local.sSQL)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Build("update GAB_6270_CUST_REGION set region_id = {1} where customer = '{0}'",V.DataTable.dtCustomer(V.Args.RowIndex).Customer!FieldValTrim,V.Local.iID,V.Local.sSQL)
+		F.Intrinsic.Control.EndIf
+		F.ODBC.conx!rst.Close
+		F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+Program.Sub.GsGCCustomer_CellValueChanged.End
+
+Program.Sub.UpdateGridDropdownlist.Start
+V.Local.i1.Declare
+V.Local.sValue.Declare
+
+F.Data.DataView.Create("dtRegion","dvRegion",22,"","Region ASC")
+F.Intrinsic.Control.For(V.Local.i1,0,V.DataView.dtRegion!dvRegion.RowCount--,1)
+	F.Intrinsic.Control.If(V.DataView.dtRegion!dvRegion(V.Local.i1).Region!FieldValTrim,<>,"")
+		F.Intrinsic.Control.If(V.Local.sValue.Trim,=,"")
+			F.Intrinsic.String.Concat("","*!*",V.DataView.dtRegion!dvRegion(V.Local.i1).Region!FieldValTrim,V.Local.sValue)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Concat(V.Local.sValue,"*!*",V.DataView.dtRegion!dvRegion(V.Local.i1).Region!FieldValTrim,V.Local.sValue)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.i1)
+F.Data.DataView.Close("dtRegion","dvRegion")
+
+gui.F_Setup.GsGCCustomer.ColumnEdit("gvCust","Region","Dropdownlist",V.Local.sValue)
+Program.Sub.UpdateGridDropdownlist.End
+
+Program.Sub.GsGCUser_RowClick.Start
+V.Local.sSQL.Declare
+
+Gui.F_Setup.GsGCCustUser.Enabled(True)
+F.Intrinsic.String.Build("select rtrim(REGION_ID), convert(1,sql_bit) from GAB_6270_USER_REGION where gss_user = '{0}'",V.DataTable.dtUser(V.Args.RowIndex).UserID!FieldValTrim,V.Local.sSQL)
+F.Data.Dictionary.CreateFromSQL("dicRegUser","conx",V.Local.sSQL)
+F.Data.Dictionary.SetDefaultReturn("dicRegUser",False)
+F.Data.DataTable.FillFromDictionary("dtRegUser","dicRegUser","ID","Selected")
+F.Data.Dictionary.Close("dicRegUser")
+V.Global.sUser.Set(V.DataTable.dtUser(V.Args.RowIndex).UserID!FieldValTrim)
+Program.Sub.GsGCUser_RowClick.End
+
+Program.Sub.GsGCCustUser_CellValueChanged.Start
+V.Local.bValue.Declare
+V.Local.sSQL.Declare
+V.Local.iSeq.Declare
+
+V.Local.bValue.Set(V.Args.Value)
+F.Intrinsic.Control.If(V.Local.bValue)
+	F.Intrinsic.String.Build("select * from GAB_6270_USER_REGION where gss_user = '{0}' and REGION_ID = '{1}'",V.Global.sUser.Trim,V.DataTable.dtRegUser(V.Args.RowIndex).ID!FieldVal,V.Local.sSQL)
+	F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.sSQL)
+	F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF)
+		F.Intrinsic.String.Build("select TOP 1 SEQ from GAB_6270_USER_REGION where gss_user = '{0}' Order by Seq Desc",V.Global.sUser.Trim, V.Local.sSQL)
+		F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.iSeq)
+		F.Intrinsic.Math.Add(V.Local.iSeq,1,V.Local.iSeq)
+		F.Intrinsic.String.Build("insert into GAB_6270_USER_REGION(gss_user,SEQ,REGION_ID) values('{0}',{1},{2});",V.Global.sUser.Trim, V.Local.iSeq, V.DataTable.dtRegUser(V.Args.RowIndex).ID!FieldVal, V.Local.sSQL)
+	F.Intrinsic.Control.EndIf
+	F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+	F.ODBC.conx!rst.Close
+F.Intrinsic.Control.Else
+	F.Intrinsic.String.Build("delete from GAB_6270_USER_REGION where gss_user = '{0}' and region_id = '{1}'",V.Global.sUser.Trim, V.DataTable.dtRegUser(V.Args.RowIndex).ID!FieldVal, V.Local.sSQL)
+	F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+F.Intrinsic.Control.EndIf
+Program.Sub.GsGCCustUser_CellValueChanged.End
+
+Program.Sub.Comments.Start
+${$0$}$$}$$}$12:00:00 AM$}$False
+${$5$}$2.0.0.0$}$2
+${$6$}$dyunus$}$20210504113655944$}$xZ6SHi8g7O0Qsxe6AiO2NH3PnOKQRy0T0b5db819Hwptco3PGz7ehyLgq4TNkFdzuvRGoPRZY/M=
+Program.Sub.Comments.End
