@@ -1,0 +1,676 @@
+﻿Program.Sub.Preflight.Start
+V.Global.sQuote.Declare
+V.Global.sSQL.Declare
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+
+F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+
+F.Intrinsic.Control.Case(10260)
+	'Open Quote
+	F.Intrinsic.Control.CallSub(Hook10260)
+F.Intrinsic.Control.Case(10660)
+	'Exit Quote Line Screen
+	F.Intrinsic.Control.CallSub(Hook10660)
+F.Intrinsic.Control.Case(10721)
+	'Change Quote Number
+	F.Intrinsic.Control.CallSub(Hook10721)
+F.Intrinsic.Control.Case(10775)
+	'Won/Loss button
+	F.Intrinsic.Control.CallSub(Hook10775)
+F.Intrinsic.Control.Case(10850)
+	'Email Quote
+	F.Intrinsic.Control.CallSub(Hook10850)	
+F.Intrinsic.Control.Case(10940)
+	'Print button
+	F.Intrinsic.Control.CallSub(Hook10940)
+F.Intrinsic.Control.Case(17330)
+	'Estimate > Transactions > Won/Loss
+	F.Intrinsic.Control.CallSub(Hook17330)
+F.Intrinsic.Control.Case(28301)
+	'BOM > Files > BOM > New/Open > Create Router > Quote > Print
+	F.Intrinsic.Control.CallSub(Hook28301)		
+F.Intrinsic.Control.EndSelect
+F.Intrinsic.Control.CallSub(End)
+F.Intrinsic.Control.ExitSub
+
+Program.Sub.Main.End
+
+Program.Sub.Hook10260.Start
+V.Local.sSQL.Declare
+V.Local.sDate.Declare
+V.Local.sFileName.Declare
+V.Local.sFile.Declare
+V.Local.bExists.Declare
+V.Local.i1.Declare
+V.Local.fRate.Declare
+V.Local.fTax.Declare
+V.Local.fTotal.Declare
+
+F.Intrinsic.String.Format(V.Ambient.Date,"YYYYMMDD",V.Local.sDate)
+F.Intrinsic.String.Concat(V.System.Temp,"\GSS\GAB_6270_",V.Caller.User,"_",V.Local.sDate,".txt",V.Local.sFileName)
+V.Local.sFile.Set("")
+
+F.Intrinsic.File.Exists(V.Local.sFileName,V.Local.bExists)
+F.Intrinsic.Control.If(V.Local.bExists,=,True)
+	F.Intrinsic.File.DeleteFile(V.Local.sFileName)
+F.Intrinsic.Control.EndIf
+
+f.Intrinsic.String.LPad(V.Passed.000060,"0",7,V.Global.sQuote)
+'F.Intrinsic.String.Build("SELECT A.CUSTOMER, B.DATE_QUOTE, B.DATE_DUE, sum(Extension) as AMOUNT FROM V_QUOTE_LINES A LEFT JOIN V_QUOTE_HEADER B ON A.QUOTE_NO = B.QUOTE_NO WHERE A.QUOTE_NO='{0}' GROUP BY A.CUSTOMER, B.DATE_QUOTE, B.DATE_DUE",V.Global.sQuote,V.Local.sSQL)
+'F.Data.DataTable.CreateFromSQL("dtQuote","conx",V.Local.sSQL,True)
+'F.Intrinsic.Control.If(V.DataTable.dtQuote.RowCount,>,0)
+'	F.Intrinsic.String.Build("{0}*!*{1}",V.Global.sQuote, V.DataTable.dtQuote(0).Amount!FieldValFloat, V.Local.sFile)
+'F.Intrinsic.Control.ElseIf(V.DataTable.dtQuote.RowCount,=,0)
+'	F.Intrinsic.String.Build("{0}*!*0",V.Global.sQuote, V.Local.sFile)
+'F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("SELECT A.CUSTOMER, B.DATE_QUOTE, B.DATE_DUE, Extension, A.Tax_1, A.Tax_2, A.Tax_3, A.Tax_4, A.Tax_5, A.Tax_6, A.Tax_7, A.Tax_8, A.Tax_9, A.Tax_10, A.Tax_Apply_1, A.Tax_Apply_2, A.Tax_Apply_3, A.Tax_Apply_4, A.Tax_Apply_5, A.Tax_Apply_6, A.Tax_Apply_7, A.Tax_Apply_8, A.Tax_Apply_9, A.Tax_Apply_10, A.Tax_Zone_1, A.Tax_Zone_2, A.Tax_Zone_3, A.Tax_Zone_4, A.Tax_Zone_5, A.Tax_Zone_6, A.Tax_Zone_7, A.Tax_Zone_8, A.Tax_Zone_9, A.Tax_Zone_10 FROM V_QUOTE_LINES A LEFT JOIN V_QUOTE_HEADER B ON A.QUOTE_NO = B.QUOTE_NO WHERE A.QUOTE_NO='{0}'",V.Global.sQuote,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("dtQuote","conx",V.Local.sSQL,True)
+F.Intrinsic.Control.If(V.DataTable.dtQuote.RowCount,>,0)
+	F.Intrinsic.Control.For(V.Local.i1,0,V.DataTable.dtQuote.RowCount--,1)
+		'Get Tax 1 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_1!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_1!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_1!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 2 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_2!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_2!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_2!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 3 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_3!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_3!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_3!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+
+		'Get Tax 4 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_4!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_4!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_4!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 5 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_5!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_5!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_5!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 6 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_6!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_6!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_6!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 7 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_7!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_7!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_7!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 8 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_8!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_8!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_8!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 9 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_9!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_9!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_9!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 10 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_10!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_10!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_10!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+		F.Intrinsic.Control.EndIf
+		
+		F.Intrinsic.Math.Add(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat, V.Local.fTotal, V.Local.fTotal)
+		
+	F.Intrinsic.Control.Next(V.Local.i1)
+	F.Intrinsic.String.Build("{0}*!*{1}",V.Global.sQuote, V.Local.fTotal, V.Local.sFile)
+F.Intrinsic.Control.Else
+	F.Intrinsic.String.Build("{0}*!*{1}",V.Global.sQuote, 0, V.Local.sFile)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.File.String2File(V.Local.sFileName,V.Local.sFile)
+F.Data.DataTable.Close("dtQuote")
+Program.Sub.Hook10260.End
+
+Program.Sub.Hook10660.Start
+V.Local.sSQL.Declare
+V.Local.sDate.Declare
+V.Local.sFileName.Declare
+V.Local.sFile.Declare
+V.Local.fAmount.Declare
+V.Local.sTemp.Declare
+V.Local.i1.Declare
+V.Local.fRate.Declare
+V.Local.fTax.Declare
+V.Local.fTotal.Declare
+V.Local.fTotalCust.Declare
+
+f.Intrinsic.String.LPad(V.Passed.000060,"0",7,V.Global.sQuote)
+F.Intrinsic.String.Format(V.Ambient.Date,"YYYYMMDD",V.Local.sDate)
+F.Intrinsic.String.Concat(V.System.Temp,"\GSS\GAB_6270_",V.Caller.User,"_",V.Local.sDate,".txt",V.Local.sFileName)
+F.Intrinsic.File.File2String(V.Local.sFileName,V.Local.sFile)
+F.Intrinsic.String.Split(V.Local.sFile(0).Trim,"*!*",V.Local.sTemp)
+F.Intrinsic.Math.ConvertToFloat(V.Local.sTemp(1),V.Local.fAmount)
+
+F.Intrinsic.String.Build("SELECT A.CUSTOMER, B.DATE_QUOTE, B.DATE_DUE, Extension, Extension_Quote, A.Tax_1, A.Tax_2, A.Tax_3, A.Tax_4, A.Tax_5, A.Tax_6, A.Tax_7, A.Tax_8, A.Tax_9, A.Tax_10, A.Tax_Apply_1, A.Tax_Apply_2, A.Tax_Apply_3, A.Tax_Apply_4, A.Tax_Apply_5, A.Tax_Apply_6, A.Tax_Apply_7, A.Tax_Apply_8, A.Tax_Apply_9, A.Tax_Apply_10, A.Tax_Zone_1, A.Tax_Zone_2, A.Tax_Zone_3, A.Tax_Zone_4, A.Tax_Zone_5, A.Tax_Zone_6, A.Tax_Zone_7, A.Tax_Zone_8, A.Tax_Zone_9, A.Tax_Zone_10 FROM V_QUOTE_LINES A LEFT JOIN V_QUOTE_HEADER B ON A.QUOTE_NO = B.QUOTE_NO WHERE A.QUOTE_NO='{0}'",V.Global.sQuote,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("dtQuote","conx",V.Local.sSQL,True)
+F.Intrinsic.Control.If(V.DataTable.dtQuote.RowCount,>,0)
+	F.Intrinsic.Control.For(V.Local.i1,0,V.DataTable.dtQuote.RowCount--,1)
+		'Get Tax 1 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_1!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_1!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_1!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 2 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_2!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_2!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_2!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 3 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_3!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_3!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_3!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+
+		'Get Tax 4 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_4!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_4!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_4!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 5 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_5!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_5!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_5!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 6 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_6!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_6!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_6!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 7 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_7!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_7!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_7!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 8 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_8!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_8!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_8!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 9 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_9!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_9!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_9!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+		
+		'Get Tax 10 Amount
+		F.Intrinsic.Control.If(V.DataTable.dtQuote(V.Local.i1).Tax_Apply_10!FieldValTrim,=,"Y")
+			F.Intrinsic.String.Build("SELECT RATE FROM V_AR_TAX_TABLES WHERE ZONE = '{0}' AND AUTH = '{1}'",V.DataTable.dtQuote(V.Local.i1).Tax_Zone_10!FieldValTrim, V.DataTable.dtQuote(V.Local.i1).Tax_10!FieldValTrim, V.Local.sSQL)
+			F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.fRate)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotal, V.Local.fTax, V.Local.fTotal)
+			F.Intrinsic.Math.Mult(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat,V.Local.fRate,V.Local.fTax)
+			F.Intrinsic.Math.Round(V.Local.fTax,2,V.Local.fTax)
+			F.Intrinsic.Math.Add(V.Local.fTotalCust, V.Local.fTax, V.Local.fTotalCust)			
+		F.Intrinsic.Control.EndIf
+		
+		F.Intrinsic.Math.Add(V.DataTable.dtQuote(V.Local.i1).Extension!FieldValFloat, V.Local.fTotal, V.Local.fTotal)
+		F.Intrinsic.Math.Add(V.DataTable.dtQuote(V.Local.i1).Extension_Quote!FieldValFloat, V.Local.fTotalCust, V.Local.fTotalCust)
+		
+	F.Intrinsic.Control.Next(V.Local.i1)
+F.Intrinsic.Control.Else
+	F.Intrinsic.UI.Msgbox("This Quote is not added into quote approval. Please add at least one quote line.","Quote Approval (6270)")
+	F.Intrinsic.File.DeleteFile(V.Local.sFileName)
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("SELECT * FROM GAB_6270_APRVL WHERE QUOTE_NO='{0}'",V.Global.sQuote,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("dtGAB","conx",V.Local.sSQL,True)
+F.Intrinsic.Control.If(V.DataTable.dtGAB.RowCount,=,0)
+	F.Intrinsic.String.Build("insert into GAB_6270_APRVL(QUOTE_NO, DATE_QUOTE, CUSTOMER, AMOUNT, CUST_AMOUNT, DATE_DUE, ORIGINATOR) values('{0}', '{1}', '{2}', {3}, {4}, '{5}', '{6}');",V.Global.sQuote, V.DataTable.dtQuote(0).Date_Quote!FieldValPervasiveDate, V.DataTable.dtQuote(0).Customer!FieldValTrim, V.Local.fTotal, V.Local.fTotalCust, V.DataTable.dtQuote(0).Date_Due!FieldValPervasiveDate, V.Caller.User, V.Local.sSQL)
+F.Intrinsic.Control.ElseIf(V.DataTable.dtGAB.RowCount,>,0)
+	F.Intrinsic.Control.If(V.Local.fAmount,<>,V.Local.fTotal)
+		F.Intrinsic.String.Build("update GAB_6270_APRVL set DATE_QUOTE = '{1}', Amount = {3}, Cust_Amount = {4}, DATE_DUE = '{5}', Approver = '*REVISE*' where Quote_No = '{0}'",V.Global.sQuote, V.DataTable.dtQuote(0).Date_Quote!FieldValPervasiveDate, V.DataTable.dtQuote(0).Customer!FieldValTrim, V.Local.fTotal, V.Local.fTotalCust, V.DataTable.dtQuote(0).Date_Due!FieldValPervasiveDate, V.Caller.User, V.Local.sSQL)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+
+F.Intrinsic.File.DeleteFile(V.Local.sFileName)
+Program.Sub.Hook10660.End
+
+Program.Sub.Hook10721.Start
+V.Local.sSQL.Declare
+
+F.Intrinsic.String.LPad(V.Passed.000003,"0",7,V.Global.sQuote)
+F.Intrinsic.String.Build("SELECT * FROM GAB_6270_APRVL WHERE QUOTE_NO='{0}'",V.Global.sQuote,V.Local.sSQL)
+F.ODBC.Connection!conx.OpenLocalRecordsetRO("rstGAB",V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.EOF,=,False)
+	F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,=,"")
+'		F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+		V.Passed.777777.Set(1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REJECT*")
+		F.Intrinsic.Control.AndIf(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REVISE*")
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",0)
+			V.Passed.000081.Set(V.ODBC.conx!rstGAB.FieldValTrim!Approver)
+		F.Intrinsic.Control.Else
+'			F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+			V.Passed.777777.Set(1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+'	F.Intrinsic.UI.Msgbox("This Quote is not found in Quote Approval. Please open this Quote thru Estimating/Routing > Files > Quote > Open, hit Line buton and close the line screen. And then please approve this Quote by approver.","Quote Approval (6270)")
+	V.Passed.777777.Set(1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+F.Intrinsic.Control.EndIf
+F.ODBC.Connection!conx.CloseRecordsets("rstGAB")
+Program.Sub.Hook10721.End
+
+Program.Sub.Hook10940.Start
+V.Local.sSQL.Declare
+
+F.Intrinsic.String.LPad(V.Passed.000003,"0",7,V.Global.sQuote)
+F.Intrinsic.String.Build("SELECT * FROM GAB_6270_APRVL WHERE QUOTE_NO='{0}'",V.Global.sQuote,V.Local.sSQL)
+F.ODBC.Connection!conx.OpenLocalRecordsetRO("rstGAB",V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.EOF,=,False)
+	F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,=,"")
+		F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+		V.Passed.777777.Set(1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REJECT*")
+		F.Intrinsic.Control.AndIf(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REVISE*")
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",0)
+			V.Passed.000081.Set(V.ODBC.conx!rstGAB.FieldValTrim!Approver)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+			V.Passed.777777.Set(1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	F.Intrinsic.UI.Msgbox("This Quote is not found in Quote Approval. Please open this Quote thru Estimating/Routing > Files > Quote > Open, hit Line buton and close the line screen. And then please approve this Quote by approver.","Quote Approval (6270)")
+	V.Passed.777777.Set(1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)	
+F.Intrinsic.Control.EndIf
+F.ODBC.Connection!conx.CloseRecordsets("rstGAB")
+Program.Sub.Hook10940.End
+
+Program.Sub.Hook10775.Start
+V.Local.sSQL.Declare
+
+F.Intrinsic.String.LPad(V.Passed.000003,"0",7,V.Global.sQuote)
+F.Intrinsic.String.Build("SELECT * FROM GAB_6270_APRVL WHERE QUOTE_NO='{0}'",V.Global.sQuote,V.Local.sSQL)
+F.ODBC.Connection!conx.OpenLocalRecordsetRO("rstGAB",V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.EOF,=,False)
+	F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,=,"")
+		F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+		V.Passed.777777.Set(1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REJECT*")
+		F.Intrinsic.Control.AndIf(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REVISE*")
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",0)
+			V.Passed.000081.Set(V.ODBC.conx!rstGAB.FieldValTrim!Approver)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+			V.Passed.777777.Set(1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	F.Intrinsic.UI.Msgbox("This Quote is not found in Quote Approval. Please open this Quote thru Estimating/Routing > Files > Quote > Open, hit Line buton and close the line screen. And then please approve this Quote by approver.","Quote Approval (6270)")
+	V.Passed.777777.Set(1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)	
+F.Intrinsic.Control.EndIf
+F.ODBC.Connection!conx.CloseRecordsets("rstGAB")
+Program.Sub.Hook10775.End
+
+Program.Sub.Hook10850.Start
+V.Local.sSQL.Declare
+
+F.Intrinsic.String.LPad(V.Passed.000003,"0",7,V.Global.sQuote)
+F.Intrinsic.String.Build("SELECT * FROM GAB_6270_APRVL WHERE QUOTE_NO='{0}'",V.Global.sQuote,V.Local.sSQL)
+F.ODBC.Connection!conx.OpenLocalRecordsetRO("rstGAB",V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.EOF,=,False)
+	F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,=,"")
+		F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+		V.Passed.777777.Set(1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REJECT*")
+		F.Intrinsic.Control.AndIf(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REVISE*")
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",0)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",0)
+			V.Passed.000081.Set(V.ODBC.conx!rstGAB.FieldValTrim!Approver)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+			V.Passed.777777.Set(1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	F.Intrinsic.UI.Msgbox("This Quote is not found in Quote Approval. Please open this Quote thru Estimating/Routing > Files > Quote > Open, hit Line buton and close the line screen. And then please approve this Quote by approver.","Quote Approval (6270)")
+	V.Passed.777777.Set(1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)	
+F.Intrinsic.Control.EndIf
+F.ODBC.Connection!conx.CloseRecordsets("rstGAB")
+Program.Sub.Hook10850.End
+
+Program.Sub.Hook17330.Start
+V.Local.sSQL.Declare
+
+F.Intrinsic.String.LPad(V.Passed.000002,"0",7,V.Global.sQuote)
+F.Intrinsic.String.Build("SELECT * FROM GAB_6270_APRVL WHERE QUOTE_NO='{0}'",V.Global.sQuote,V.Local.sSQL)
+F.ODBC.Connection!conx.OpenLocalRecordsetRO("rstGAB",V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.EOF,=,False)
+	F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,=,"")
+		F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+		V.Passed.777777.Set(1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REJECT*")
+		F.Intrinsic.Control.AndIf(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REVISE*")
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",0)
+'			V.Passed.000081.Set(V.ODBC.conx!rstGAB.FieldValTrim!Approver)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+			V.Passed.777777.Set(1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	F.Intrinsic.UI.Msgbox("This Quote is not found in Quote Approval. Please open this Quote thru Estimating/Routing > Files > Quote > Open, hit Line buton and close the line screen. And then please approve this Quote by approver.","Quote Approval (6270)")
+	V.Passed.777777.Set(1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000079,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000080,"HIDE",1)
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000110,"HIDE",1)	
+F.Intrinsic.Control.EndIf
+F.ODBC.Connection!conx.CloseRecordsets("rstGAB")
+Program.Sub.Hook17330.End
+
+Program.Sub.Hook28301.Start
+V.Local.sSQL.Declare
+
+F.Intrinsic.String.LPad(Variable.Passed.000001,"0",7,V.Global.sQuote)
+F.Intrinsic.String.Build("SELECT * FROM GAB_6270_APRVL WHERE QUOTE_NO='{0}'",V.Global.sQuote,V.Local.sSQL)
+F.ODBC.Connection!conx.OpenLocalRecordsetRO("rstGAB",V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.EOF,=,False)
+	F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,=,"")
+'		F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+		V.Passed.777777.Set(1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+		F.Intrinsic.UI.ChangeCallerProperty(Variable.Passed.000006,"HIDE",1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REJECT*")
+		F.Intrinsic.Control.AndIf(V.ODBC.conx!rstGAB.FieldValTrim!Approver,<>,"*REVISE*")
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",0)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",0)
+			F.Intrinsic.UI.ChangeCallerProperty(Variable.Passed.000006,"HIDE",0)
+		F.Intrinsic.Control.Else
+'			F.Intrinsic.UI.Msgbox("Please approve this Quote first.","Quote Approval (6270)")
+			V.Passed.777777.Set(1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+			F.Intrinsic.UI.ChangeCallerProperty(Variable.Passed.000006,"HIDE",1)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+'	F.Intrinsic.UI.Msgbox("This Quote is not found in Quote Approval. Please open this Quote thru Estimating/Routing > Files > Quote > Open, hit Line buton and close the line screen. And then please approve this Quote by approver.","Quote Approval (6270)")
+	V.Passed.777777.Set(1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000050,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000072,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000074,"LOCK",1)
+'	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000077,"LOCK",1)
+	F.Intrinsic.UI.ChangeCallerProperty(Variable.Passed.000006,"HIDE",1)
+F.Intrinsic.Control.EndIf
+F.ODBC.Connection!conx.CloseRecordsets("rstGAB")
+Program.Sub.Hook28301.End
+
+Program.Sub.End.Start
+F.ODBC.Connection!conx.Close
+F.Intrinsic.Control.End'
+
+F.Intrinsic.Control.ExitSub
+Program.Sub.End.End
+
+Program.Sub.Comments.Start
+${$5$}$3.0.0.0$}$1
+${$6$}$dyunus$}$20211021081252102$}$xZ6SHi8g7O0Qsxe6AiO2NH3PnOKQRy0TBQrn2CRugKzmDUDlZxqXBgWztUtGbcjw46pkSy7P0sc=
+Program.Sub.Comments.End
